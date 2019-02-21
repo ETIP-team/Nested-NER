@@ -4,7 +4,7 @@
 #### nested problem with evaluation
 | GT type | Label |
 | :-: | :-: | 
-| no nested  | 0
+| no nested    | 0
 | AA nested    | 1
 | AB nested    | 2
 | AA&AB nested | 3
