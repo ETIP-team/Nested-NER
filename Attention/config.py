@@ -13,11 +13,9 @@ class Config:
         # global config
         self.cuda = True  # False
         self.WORD_VEC_MODEL_PATH = "./model/word_vector_model/wikipedia-pubmed-and-PMC-w2v.bin"  # ACE05
-        # self.WORD_VEC_MODEL_PATH = "./model/word_vector_model/bio_nlp_vec.tar/bio_nlp_vec/PubMed-shuffle-win-2.bin"
-
         # model config.
 
-        self.attention_method = "general"  # "general",  "dot",  "concate"
+        self.attention_method = "concate_before_attention"  # "general",  "dot",  "concate", "PLQ", "concate_before_attention"
         self.embedding_dim = 200
         # self.num_embeddings = 5
         self.hidden_units = 100  # embedding size must equals hidden_units * 2
@@ -36,7 +34,7 @@ class Config:
             self.bio_labels.extend(["B-" + one_label, "I-" + one_label])
 
         self.classes_num = len(self.bio_labels)  # Begin, Inside, Out of entity
-        self.max_nested_level = 1
+        self.max_nested_level = 3
 
         # train config
         self.num_batch = 4
@@ -44,7 +42,7 @@ class Config:
         self.max_epoch = 20
         self.start_save_epoch = 1
 
-        self.start_test_epoch = 10
+        self.start_test_epoch = 5
 
         self.train_data = None
         self.train_label = None

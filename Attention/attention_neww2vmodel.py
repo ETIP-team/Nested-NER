@@ -195,5 +195,10 @@ class geniaDataset:
 
 class w2VModel:
     def __init__(self, path, binary_wv_model=True):
+        print(path)
+
         # self.w2vmodel = gensim.models.KeyedVectors.load_word2vec_format(path, binary=binary_wv_model, limit=10)
+        # print("Limited WV")
+
         self.w2vmodel = gensim.models.KeyedVectors.load_word2vec_format(path, binary=binary_wv_model)
+        print("Full WV")

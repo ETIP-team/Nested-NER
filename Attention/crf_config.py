@@ -50,7 +50,7 @@ class Config:
         self.max_epoch = 20
         self.start_save_epoch = 1
 
-        self.start_test_epoch = 1
+        self.start_test_epoch = 6
 
         self.train_data = None
         self.train_label = None
