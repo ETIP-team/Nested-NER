@@ -2,7 +2,7 @@ import gensim
 import re
 # from torch.utils.data import DataLoader
 import torch
-from config import Config
+from bilstm_attention_crf_4_13.crf_config import Config
 
 
 class geniaDataset:

@@ -11,10 +11,10 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
 
-from bilstm_attention_control_method_2_3 import AttentionNestedNERModel
-from config import Config
-from attention_neww2vmodel import geniaDataset
-from utils import data_prepare
+from bilstm_attention_one_layer_4_20.bilstm_attention_one_layer import AttentionNestedNERModel
+from bilstm_attention_one_layer_4_20.one_layer_config import Config
+from bilstm_attention_one_layer_4_20.attention_neww2vmodel import geniaDataset
+from bilstm_attention_one_layer_4_20.utils import data_prepare_one_layer
 
 
 def train_one_batch(config: Config, model: AttentionNestedNERModel, one_batch_data: list, one_batch_label: list,
@@ -101,8 +101,9 @@ def main():
     model = AttentionNestedNERModel(config, word_dict).cuda() if config.cuda else AttentionNestedNERModel(config,
                                                                                                           word_dict)
 
-    config.train_data, config.train_str, config.train_label = data_prepare(config, config.get_train_path(), word_dict)
-
+    config.train_data, config.train_str, config.train_label = data_prepare_one_layer(config, config.get_train_path(), word_dict)
+    del word_dict
+    print("del word_dict")
     start_training(config, model)
 
 

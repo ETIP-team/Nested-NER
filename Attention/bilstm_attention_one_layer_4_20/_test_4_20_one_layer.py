@@ -9,12 +9,12 @@ from torch.autograd import Variable
 import pandas as pd
 import numpy as np
 
-from bilstm_attention_crf import AttentionNestedNERModel
-from crf_config import Config
-from attention_neww2vmodel import geniaDataset
+from bilstm_attention_one_layer_4_20.bilstm_attention_one_layer import AttentionNestedNERModel
+from bilstm_attention_one_layer_4_20.one_layer_config import Config
+from bilstm_attention_one_layer_4_20.attention_neww2vmodel import geniaDataset
 
-from utils import data_prepare, output_summary, output_sent, output_level
-from utils import find_entities, find_entities_relax
+from bilstm_attention_one_layer_4_20.utils import data_prepare_one_layer, output_summary, output_sent, output_level
+from bilstm_attention_one_layer_4_20.utils import find_entities, find_entities_relax
 
 
 def get_metrics(config: Config) -> pd.DataFrame:
@@ -119,15 +119,12 @@ def _test_one_sentence(config: Config, model: AttentionNestedNERModel, word_ids:
     else:
         one_seq_word_ids = Variable(t.Tensor([word_ids]).long())
 
-    predict_score, predict_result = model.predict(one_seq_word_ids)
-    # todo process here.
-    predict_result = np.array(predict_result)
-    # predict_result = np.array(predict_result).reshape(config.max_nested_level, len(word_ids), 1,
-    #                                                        len(config.bio_labels))
-    # predict_result = predict_result.squeeze(2)  # remove batch num = 1
-    # predict_result = predict_result.cpu().data.numpy()
+    predict_result = model.forward(one_seq_word_ids, config.max_nested_level).squeeze(1)  # [seq_len, BIO labels]
+    predict_result = predict_result.reshape(config.max_nested_level, len(word_ids), 1, len(config.bio_labels))
+    predict_result = predict_result.squeeze(2)  # remove batch num = 1
+    predict_result = predict_result.cpu().data.numpy()
     for nested_level in range(config.max_nested_level):
-        predict_bio_label_index = predict_result[nested_level]
+        predict_bio_label_index = np.argmax(predict_result[nested_level], axis=1)
         # todo rectify.
         # predict_bio_label_index = rectify_bio_labels(predict_bio_label_index)
         # predict_bio_label_index = t.argmax(predict_result, dim=1).cpu().data.numpy()
@@ -151,12 +148,13 @@ def _test(config: Config, model: AttentionNestedNERModel):
     config.metric_dicts = [{"TP": 0, "FP": 0, "FN": 0} for i in range(len(config.labels))]
     # start test.
     config.result_file = open(config.output_path, "w")
+
     for test_index in range(len(config.test_data)):
         output_sent(config.result_file, config.test_str[test_index])
         word_ids = config.test_data[test_index]
         gt_labels = config.test_label[test_index]
         gt_entities = []
-        for nested_level_index in range(len(gt_labels)):  # all nested levels.
+        for nested_level_index in range(len(gt_labels)):  # only one nested level.
             # for nested_level_index in range(config.max_nested_level):  # todo attention this gt label!
             output_level(config.result_file, nested_level_index, config.bio_labels, gt_labels[nested_level_index], "gt")
 
@@ -168,16 +166,28 @@ def _test(config: Config, model: AttentionNestedNERModel):
         evaluate(config, predict_candidates, gt_entities)
         output_summary(config.result_file, config.test_str[test_index], config.labels, predict_candidates, gt_entities)
     # print result
-    print(get_metrics(config))
+    metrics_df = get_metrics(config)
+
+    print(metrics_df)
     config.result_file.close()
-    return
+    return metrics_df
 
 
 def start_test(config: Config, model: AttentionNestedNERModel):
     print("Start Testing------------------------------------------------", "\n" * 2)
-    for epoch in range(config.start_test_epoch - 1, config.max_epoch):
-        model = config.load_model(model, epoch)
-        _test(config, model)
+    best_f1_df = pd.DataFrame([[0]], columns=["F1"])
+    best_epoch = 1
+    for epoch in range(config.start_test_epoch, config.max_epoch):
+        try:
+            model = config.load_model(model, epoch)
+            metrics_df = _test(config, model)
+            if metrics_df["F1"].tolist()[-1] > best_f1_df["F1"].tolist()[-1]:
+                best_f1_df = metrics_df
+                best_epoch = epoch
+        except Exception:
+            break
+
+    best_f1_df.to_csv(config.result_output_path(best_epoch), index=None)
     return
 
 
@@ -187,8 +197,9 @@ def main():
     model = AttentionNestedNERModel(config, word_dict).cuda() if config.cuda else AttentionNestedNERModel(config,
                                                                                                           word_dict)
 
-    config.test_data, config.test_str, config.test_label = data_prepare(config, config.get_test_path(), word_dict)
-
+    config.test_data, config.test_str, config.test_label = data_prepare_one_layer(config, config.get_test_path(),
+                                                                                  word_dict)
+    del word_dict
     start_test(config, model)
 
 

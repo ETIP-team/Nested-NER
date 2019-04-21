@@ -12,7 +12,7 @@ class Config:
     def __init__(self):
         # global config
         self.cuda = True  # False
-        self.WORD_VEC_MODEL_PATH = "./model/word_vector_model/wikipedia-pubmed-and-PMC-w2v.bin"  # ACE05
+        self.WORD_VEC_MODEL_PATH = "../model/word_vector_model/wikipedia-pubmed-and-PMC-w2v.bin"  # ACE05
         # model config.
 
         self.attention_method = "concate_before_attention"  # "general",  "dot",  "concate", "PLQ", "concate_before_attention"
@@ -34,15 +34,17 @@ class Config:
             self.bio_labels.extend(["B-" + one_label, "I-" + one_label])
 
         self.classes_num = len(self.bio_labels)  # Begin, Inside, Out of entity
-        self.max_nested_level = 3
+        self.nested_level = 2  # training layer.
+
+        self.max_nested_level = 1
 
         # train config
         self.num_batch = 4
 
-        self.max_epoch = 20
+        self.max_epoch = 50
         self.start_save_epoch = 1
 
-        self.start_test_epoch = 5
+        self.start_test_epoch = 3
 
         self.train_data = None
         self.train_label = None
@@ -55,13 +57,32 @@ class Config:
         self.test_label = None
         self.metric_dicts = None
 
-        self.output_path = "./result/result.data"
+        self.output_path = "../result/result.data"
 
     def model_save_path(self, epoch, create_flag=True):
-        final_model_path = "./model/" + self.dataset_type + "/"
+        final_model_path = "../model/" + self.dataset_type + "/"
         final_model_path += "bi_" if self.encode_bi_flag else ""
         final_model_path += self.attention_method
-        final_model_path += "_max_nested_level_" + str(self.max_nested_level)
+        final_model_path += "_nested_level_" + str(self.nested_level)
+        final_model_path += "_hidden_units_" + str(self.hidden_units)
+        final_model_path += "_learning_rate_" + str(self.learning_rate)
+        final_model_path += "_num_batch_" + str(self.num_batch)
+        final_model_path += "_l2_" + str(self.l2_penalty)
+        final_model_path += "_1_linear"
+        # todo add.
+
+        final_model_path += "/"
+        if create_flag and not os.path.exists(final_model_path):
+            os.makedirs(final_model_path)
+            print("create model dir " + final_model_path + " successfully")
+
+        return final_model_path + "model_epoch_" + str(epoch + 1) + ".pth"
+
+    def result_output_path(self, epoch, create_flag=True):
+        final_model_path = "../result/" + self.dataset_type + "/"
+        final_model_path += "bi_" if self.encode_bi_flag else ""
+        final_model_path += self.attention_method
+        final_model_path += "_nested_level_" + str(self.nested_level)
         final_model_path += "_hidden_units_" + str(self.hidden_units)
         final_model_path += "_learning_rate_" + str(self.learning_rate)
         final_model_path += "_num_batch_" + str(self.num_batch)
@@ -92,13 +113,13 @@ class Config:
         return
 
     def get_train_path(self):
-        return "./data/big_first/layer_train.data"
+        return "../data/big_first/layer_train.data"
 
     def get_dev_path(self):
-        return "./data/big_first/layer_dev.data"
+        return "../data/big_first/layer_dev.data"
 
     def get_test_path(self):
-        return "./data/big_first/layer_test.data"
+        return "../data/big_first/layer_test.data"
 
 
 if __name__ == '__main__':

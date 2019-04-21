@@ -9,12 +9,12 @@ from torch.autograd import Variable
 import pandas as pd
 import numpy as np
 
-from bilstm_attention import AttentionNestedNERModel
-from config import Config
-from attention_neww2vmodel import geniaDataset
+from bilstm_attention_control_method_4_16.bilstm_attention_control_method_2_3 import AttentionNestedNERModel
+from bilstm_attention_control_method_4_16.control_config import Config
+from bilstm_attention_control_method_4_16.attention_neww2vmodel import geniaDataset
 
-from utils import data_prepare, output_summary, output_sent, output_level
-from utils import find_entities, find_entities_relax
+from bilstm_attention_control_method_4_16.utils import data_prepare, output_summary, output_sent, output_level
+from bilstm_attention_control_method_4_16.utils import find_entities, find_entities_relax
 
 
 def get_metrics(config: Config) -> pd.DataFrame:
@@ -185,7 +185,7 @@ def main():
                                                                                                           word_dict)
 
     config.test_data, config.test_str, config.test_label = data_prepare(config, config.get_test_path(), word_dict)
-
+    del word_dict
     start_test(config, model)
 
 

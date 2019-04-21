@@ -11,8 +11,8 @@ import torch.nn.functional as F
 
 from torch.autograd import Variable
 
-from config import Config
-from attention_neww2vmodel import geniaDataset
+from bilstm_attention_control_method_4_16.control_config import Config
+from bilstm_attention_control_method_4_16.attention_neww2vmodel import geniaDataset
 
 
 class AttentionNestedNERModel(nn.Module):
@@ -33,28 +33,38 @@ class AttentionNestedNERModel(nn.Module):
         self.embedding = nn.Embedding.from_pretrained(word_dic.weight)
         self.embedding.weight.requires_grad = True
 
-        decode_hidden_units = hidden_units * 2 if encode_bi_flag else hidden_units
+        self.decode_hidden_units = hidden_units * 2 if encode_bi_flag else hidden_units
         # max nested level one hot!
         # * 3 is VNER.
-        self.decode_lstm = nn.LSTM(decode_hidden_units * 2 + self.config.max_nested_level, hidden_units * 2,
-                                   decode_num_layers)
+        if self.config.attention_method != "PLQ" and self.config.attention_method != "concate_before_attention":
+            self.decode_lstm = nn.LSTM(self.decode_hidden_units * 2 + self.config.max_nested_level, hidden_units * 2,
+                                       decode_num_layers)
+        else:
+            self.decode_lstm = nn.LSTM(self.decode_hidden_units * 2, hidden_units * 2, decode_num_layers)
 
         if self.config.attention_method == "concate":
-            self.weight_linear = nn.Linear(decode_hidden_units + embedding_dim, 1)
+            self.weight_linear = nn.Linear(self.decode_hidden_units + embedding_dim, 1)
         elif self.config.attention_method == "general":  # general
-            self.weight_linear = nn.Linear(hidden_units * 2, hidden_units * 2, bias=False)
+            self.weight_linear = nn.Linear(self.decode_hidden_units, self.decode_hidden_units, bias=False)
+        elif self.config.attention_method == "PLQ":  # method 2
+            self.P_weight = nn.Parameter(t.randn(self.decode_hidden_units, self.config.max_nested_level))
+            self.Q_weight = nn.Parameter(t.randn(self.config.max_nested_level, self.decode_hidden_units))
+        elif self.config.attention_method == "concate_before_attention":  # method 3
+            self.weight_linear = nn.Linear(self.decode_hidden_units + self.config.max_nested_level,
+                                           self.decode_hidden_units + self.config.max_nested_level, bias=False)
+        # nested flag weight
         else:  # dot method. should not go here.
             pass
 
-        # self.linear1 = nn.Linear(decode_hidden_units, self.linear_hidden_units)
+        # self.linear1 = nn.Linear(self.decode_hidden_units, self.linear_hidden_units)
         # 4-12 one linear layer.
         # self.linear2 = nn.Linear(self.linear_hidden_units, self.classes_num)
-        self.linear2 = nn.Linear(decode_hidden_units, self.classes_num)
+        self.linear2 = nn.Linear(self.decode_hidden_units, self.classes_num)
 
         self.optimizer = None
         self.cross_entropy_loss = nn.CrossEntropyLoss()
 
-    def compute_context_input(self, s_i: Variable, h: Variable, time: int) -> Variable:
+    def compute_context_input(self, s_i: Variable, h: Variable, time: int, current_nested_level: int) -> Variable:
         """
         To compute context input in time t+1 in different compute type.
 
@@ -64,8 +74,21 @@ class AttentionNestedNERModel(nn.Module):
         :return:
         """
         # context_input =
+
         seq_len = h.shape[0]
         num_batch = h.shape[1]
+
+        # one hot
+        one_hot_control_nested_np = np.zeros((1, num_batch, self.config.max_nested_level))
+        one_hot_control_nested_np[:, :, current_nested_level] = 1
+        control_nested_tensor = t.Tensor(
+            one_hot_control_nested_np)  # [seq_len = 1, num_batch, one_hot nested_level]
+        # control_nested_tensor = t.Tensor(
+        #     np.ones((1, num_batch, 1)) * control_nested_level)
+
+        control_nested_tensor = Variable(control_nested_tensor.cuda()) if self.config.cuda else Variable(
+            control_nested_tensor)
+
         if self.config.attention_method == "general":
             weight_input = self.weight_linear(h.permute(1, 0, 2))  # [num_batch, seq_len, hidden_size]
             weight_input = t.bmm(weight_input, s_i.permute(1, 2, 0))  # [num_batch, seq_len, 1]
@@ -83,6 +106,30 @@ class AttentionNestedNERModel(nn.Module):
             weight_input = t.cat([s_compute, h], 2)  # [seq_len, num_batch, hidden_size + embedding_dim]
             norm_weight = F.softmax(self.weight_linear(weight_input), dim=0).permute(1, 0,
                                                                                      2)  # [num_batch, seq_len, 1]
+
+        elif self.config.attention_method == "PLQ":  # method 2  # to test.
+            nested_matrix = Variable(t.zeros(self.config.max_nested_level, self.config.max_nested_level))
+            nested_matrix = nested_matrix.cuda() if self.config.cuda else nested_matrix
+            nested_matrix[current_nested_level, current_nested_level] = 1
+            weight_matrix = self.P_weight.mm(nested_matrix)
+
+            # h.permute(1, 0, 2)  # [num_batch, seq_len, hidden_size]
+            weight_matrix = weight_matrix.mm(self.Q_weight).unsqueeze(0).expand(num_batch, self.decode_hidden_units,
+                                                                                self.decode_hidden_units)  # [num_batch, decode_hidden_units,decode_hidden_units]
+            weight_input = t.bmm(h.permute(1, 0, 2), weight_matrix)  # [num_batch, seq_len, decode_hidden_units]
+            weight_input = t.bmm(weight_input, s_i.permute(1, 2, 0))  # [num_batch, seq_len, 1]
+            norm_weight = F.softmax(weight_input, dim=1)
+
+        elif self.config.attention_method == "concate_before_attention":  # method 3
+            s_compute = t.cat([s_i, control_nested_tensor], 2)  # [1, num_batch, decode_hidden_size + max_nested]
+            h_compute = t.cat([h, control_nested_tensor.expand(seq_len, num_batch,
+                                                               self.config.max_nested_level)],
+                              2)  # [seq_len, num_batch, decode_hidden_size + max_nested]
+
+            weight_input = self.weight_linear(h_compute.permute(1, 0, 2))  # [num_batch, seq_len, hidden_size]
+            weight_input = t.bmm(weight_input, s_compute.permute(1, 2, 0))  # [num_batch, seq_len, 1]
+            norm_weight = F.softmax(weight_input, dim=1)  # normalize in dimension seq_len
+
         else:
             raise KeyError("attention compute method not right.")
 
@@ -94,6 +141,10 @@ class AttentionNestedNERModel(nn.Module):
         context_input = t.cat([context_input, h_i], 1)  # [num_batch, embedding_dim * 2, seq_len = 1]
 
         context_input = context_input.permute(2, 0, 1)  # [seq_len = 1, num_batch, embedding * 2]
+
+        if self.config.attention_method != "PLQ" and self.config.attention_method != "concate_before_attention":
+            context_input = t.cat([context_input, control_nested_tensor], 2)  # add in third dim.
+
         return context_input
 
     def forward(self, seqs, seq_max_nested_level):  # todo modify this forward to
@@ -126,15 +177,6 @@ class AttentionNestedNERModel(nn.Module):
         for control_nested_level in range(seq_max_nested_level):
             # todo one hot!
 
-            one_hot_control_nested_np = np.zeros((1, num_batch, self.config.max_nested_level))
-            one_hot_control_nested_np[:, :, control_nested_level] = 1
-            control_nested_tensor = t.Tensor(
-                one_hot_control_nested_np)  # [seq_len = 1, num_batch, one_hot nested_level]
-            # control_nested_tensor = t.Tensor(
-            #     np.ones((1, num_batch, 1)) * control_nested_level)
-
-            control_nested_tensor = Variable(control_nested_tensor.cuda()) if self.config.cuda else Variable(
-                control_nested_tensor)
             one_nested_level_output_list = []
             for context_index in range(seq_len):
                 s_compute = s_i[-1].unsqueeze(0)  # get last layer [1, num_batch, hidden_size]
@@ -142,13 +184,12 @@ class AttentionNestedNERModel(nn.Module):
                 # todo context_input add control info.
 
                 context_input = self.compute_context_input(s_compute, h,
-                                                           context_index)  # [seq_len = 1, num_batch, embedding * 2]
+                                                           context_index,
+                                                           control_nested_level)  # [seq_len = 1, num_batch, embedding * 2]
 
                 # include h_decode_s_previous.
                 # context_input = t.cat([context_input, s_compute, control_nested_tensor],
                 #                       2)  # add in third dim. 4-9 VNER
-
-                context_input = t.cat([context_input, control_nested_tensor], 2)  # add in third dim.
 
                 # save one time output and update the cell state.
 

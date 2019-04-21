@@ -11,10 +11,10 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
 
-from bilstm_attention import AttentionNestedNERModel
-from config import Config
-from attention_neww2vmodel import geniaDataset
-from utils import data_prepare
+from bilstm_attention_4_3.bilstm_attention import AttentionNestedNERModel
+from bilstm_attention_4_3.config import Config
+from bilstm_attention_4_3.attention_neww2vmodel import geniaDataset
+from bilstm_attention_4_3.utils import data_prepare
 
 
 #
@@ -106,7 +106,7 @@ def main():
                                                                                                           word_dict)
 
     config.train_data, config.train_str, config.train_label = data_prepare(config, config.get_train_path(), word_dict)
-
+    del word_dict
     start_training(config, model)
 
 

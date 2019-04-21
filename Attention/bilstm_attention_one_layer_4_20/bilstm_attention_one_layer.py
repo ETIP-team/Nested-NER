@@ -11,8 +11,8 @@ import torch.nn.functional as F
 
 from torch.autograd import Variable
 
-from config import Config
-from attention_neww2vmodel import geniaDataset
+from bilstm_attention_one_layer_4_20.one_layer_config import Config
+from bilstm_attention_one_layer_4_20.attention_neww2vmodel import geniaDataset
 
 
 class AttentionNestedNERModel(nn.Module):

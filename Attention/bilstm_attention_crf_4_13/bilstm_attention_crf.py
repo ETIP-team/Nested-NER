@@ -12,8 +12,8 @@ import torch.nn.functional as F
 
 from torch.autograd import Variable
 
-from crf_config import Config
-from attention_neww2vmodel import geniaDataset
+from bilstm_attention_crf_4_13.crf_config import Config
+from bilstm_attention_crf_4_13.attention_neww2vmodel import geniaDataset
 
 
 def argmax(vec):
@@ -129,7 +129,7 @@ class AttentionNestedNERModel(nn.Module):
         context_input = context_input.permute(2, 0, 1)  # [seq_len = 1, num_batch, embedding * 2]
         return context_input
 
-    def _get_lstm_features(self, seqs):
+    def _get_lstm_features(self, seqs, upper_nested_level: int):
         """seqs: Tensor for word idx."""
 
         seqs = self.embedding(seqs).permute(1, 0, 2)  # [seq_len, num_batch, embedding_dim]
@@ -156,7 +156,7 @@ class AttentionNestedNERModel(nn.Module):
         # hidden_size equals embedding_dim!
         output_list = []
         # decode input seq_len must 1
-        for control_nested_level in range(self.config.max_nested_level):
+        for control_nested_level in range(upper_nested_level):
             one_hot_control_nested_np = np.zeros((1, num_batch, self.config.max_nested_level))
             one_hot_control_nested_np[:, :, control_nested_level] = 1
             control_nested_tensor = t.Tensor(
@@ -287,9 +287,10 @@ class AttentionNestedNERModel(nn.Module):
 
     def neg_log_likelihood(self, seq, tags):
         # tags:[nested_level, seq_len]
-        feats = self._get_lstm_features(seq).squeeze(2)  # [nested_level, seq_len, bio_labels]
+        upper_nested_level = min(self.config.max_nested_level, tags.shape[0])
+        feats = self._get_lstm_features(seq, upper_nested_level).squeeze(2)  # [nested_level, seq_len, bio_labels]
         level_losses = []  # [nested_level, num_batch]
-        for nested_level in range(self.config.max_nested_level):
+        for nested_level in range(upper_nested_level):
             forward_score = self._forward_alg(feats[nested_level])
             gold_score = self._score_sentence(feats[nested_level], tags[nested_level].squeeze())
             level_losses.append((forward_score - gold_score))
@@ -298,7 +299,7 @@ class AttentionNestedNERModel(nn.Module):
 
     def predict(self, sentence):  # only support one sentence!
         # Get the emission scores from the BiLSTM
-        lstm_feats = self._get_lstm_features(sentence)
+        lstm_feats = self._get_lstm_features(sentence, self.config.max_nested_level)
 
         # Find the best path, given the features.
         scores = []
