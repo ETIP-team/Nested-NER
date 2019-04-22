@@ -10,7 +10,7 @@
 4.Training mode:
 >>- 1. all nested level one batch.
 >>- 2. all samples one batch.
-5.GENIA ACE04
+>- 5.GENIA ACE04
 ##### Task-Ji:
 
 ## NEXT TIME USE EXCEL.
