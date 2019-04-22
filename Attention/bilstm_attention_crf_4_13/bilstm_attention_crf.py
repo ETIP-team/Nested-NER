@@ -258,7 +258,8 @@ class AttentionNestedNERModel(nn.Module):
         # feats shape [seq_len, bio_labels]
         # num_batch = feats.shape[1]
         # Do the forward algorithm to compute the partition function
-        init_alphas = t.full((1, self.tagset_size), -10000.).cuda()
+        init_alphas = t.full((1, self.tagset_size), -10000.)
+        init_alphas = init_alphas.cuda() if self.config.cuda else init_alphas
         # START_TAG has all of the score.
         init_alphas[0][self.config.tag_to_ix[self.config.START_TAG]] = 0.
 
