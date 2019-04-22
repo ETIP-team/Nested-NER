@@ -31,7 +31,7 @@ class Config:
         self.learning_rate = 3e-4
         self.l2_penalty = 1e-4
 
-        self.dataset_type = "ACE05"
+        self.dataset_type = "ACE05_Lu"
         self.labels = ['FAC', 'GPE', 'LOC', 'ORG', 'PER', 'VEH', 'WEA']
         self.bio_labels = ["O"]
         for one_label in self.labels:
@@ -42,7 +42,7 @@ class Config:
         for i, tag in enumerate(self.bio_labels):
             self.tag_to_ix[tag] = i
         self.classes_num = len(self.bio_labels)  # Begin, Inside, Out of entity
-        self.max_nested_level = 5
+        self.max_nested_level = 3
 
         # train config
         self.num_batch = 4
@@ -100,13 +100,13 @@ class Config:
         return
 
     def get_train_path(self):
-        return "../data/big_first/layer_train.data"
+        return "../data/dataset_layer/ACE/layer_train.data"
 
     def get_dev_path(self):
-        return "../data/big_first/layer_dev.data"
+        return "../data/dataset_layer/ACE/layer_dev.data"
 
     def get_test_path(self):
-        return "../data/big_first/layer_test.data"
+        return "../data/dataset_layer/ACE/layer_test.data"
 
 
 if __name__ == '__main__':

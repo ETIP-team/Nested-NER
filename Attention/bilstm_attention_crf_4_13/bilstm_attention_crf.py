@@ -199,7 +199,11 @@ class AttentionNestedNERModel(nn.Module):
         score = t.zeros(1).cuda() if self.config.cuda else t.zeros(1)  # [1]
         start_tensor_tag = t.Tensor([self.config.tag_to_ix[self.config.START_TAG]]).long()
         start_tensor_tag = start_tensor_tag.cuda() if self.config.cuda else start_tensor_tag
-        tags = t.cat([start_tensor_tag, tags])
+        try:
+            tags = t.cat([start_tensor_tag, tags])
+        except:
+            tags = t.cat([start_tensor_tag, tags.unsqueeze(0)])
+
         for i, feat in enumerate(feats):  # i+1, i means i transfer to i+1
             score = score + self.transitions[tags[i + 1], tags[i]] + feat[tags[i + 1]]
         score = score + self.transitions[self.config.tag_to_ix[self.config.STOP_TAG], tags[-1]]
