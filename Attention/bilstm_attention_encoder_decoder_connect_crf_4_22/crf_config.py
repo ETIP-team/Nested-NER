@@ -115,7 +115,7 @@ class Config:
             return "../data/dataset_layer/ACE2004/layer_train.data"
         elif self.dataset_type == "ACE05":
             return "../data/big_first/layer_train.data"
-        elif self.dataset_type == "ACE05_lu":
+        elif self.dataset_type == "ACE05_Lu":
             return "../data/dataset_layer/ACE/layer_train.data"
 
     def get_dev_path(self):
@@ -123,7 +123,7 @@ class Config:
             return "../data/dataset_layer/ACE2004/layer_dev.data"
         elif self.dataset_type == "ACE05":
             return "../data/big_first/layer_dev.data"
-        elif self.dataset_type == "ACE05_lu":
+        elif self.dataset_type == "ACE05_Lu":
             return "../data/dataset_layer/ACE/layer_dev.data"
 
     def get_test_path(self):
@@ -131,7 +131,7 @@ class Config:
             return "../data/dataset_layer/ACE2004/layer_test.data"
         elif self.dataset_type == "ACE05":
             return "../data/big_first/layer_test.data"
-        elif self.dataset_type == "ACE05_lu":
+        elif self.dataset_type == "ACE05_Lu":
             return "../data/dataset_layer/ACE/layer_test.data"
 
 
