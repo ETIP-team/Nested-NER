@@ -56,7 +56,7 @@ def train_one_epoch(config: Config,
     train_nested_level_list = sorted(list(set(data_nested_level)))
 
     for nested_level in train_nested_level_list:
-    # for nested_level in train_nested_level_list[1:]:
+        # for nested_level in train_nested_level_list[1:]:
         sub_data = np.array(config.train_data)[data_nested_level == nested_level]
         sub_label = np.array(config.train_label)[data_nested_level == nested_level]
 
@@ -95,6 +95,7 @@ def start_training(config: Config, model: AttentionNestedNERModel):
 
 def main():
     config = Config()
+    config.list_all_member()
     word_dict = geniaDataset()
     model = AttentionNestedNERModel(config, word_dict).cuda() if config.cuda else AttentionNestedNERModel(config,
                                                                                                           word_dict)

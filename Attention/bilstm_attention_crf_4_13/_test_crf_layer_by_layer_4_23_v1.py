@@ -8,16 +8,16 @@ import torch as t
 from torch.autograd import Variable
 import pandas as pd
 import numpy as np
+from copy import deepcopy
+from bilstm_attention_crf_4_13.bilstm_attention_crf import AttentionNestedNERModel
+from bilstm_attention_crf_4_13.crf_config import Config
+from bilstm_attention_crf_4_13.attention_neww2vmodel import geniaDataset
 
-from bilstm_attention_encoder_decoder_connect_crf_4_22.bilstm_attention_crf import AttentionNestedNERModel
-from bilstm_attention_encoder_decoder_connect_crf_4_22.crf_config import Config
-from bilstm_attention_encoder_decoder_connect_crf_4_22.attention_neww2vmodel import geniaDataset
-
-from bilstm_attention_encoder_decoder_connect_crf_4_22.utils import data_prepare, output_summary, output_sent, output_level
-from bilstm_attention_encoder_decoder_connect_crf_4_22.utils import find_entities, find_entities_relax
+from bilstm_attention_crf_4_13.utils import data_prepare, output_summary, output_sent, output_level
+from bilstm_attention_crf_4_13.utils import find_entities, find_entities_relax
 
 
-def get_metrics(config: Config) -> pd.DataFrame:
+def get_metrics_one_layer(config: Config, one_layer_metrics: list) -> pd.DataFrame:
     """
 
     :param config: Config file, used labels, metric_dicts
@@ -31,10 +31,10 @@ def get_metrics(config: Config) -> pd.DataFrame:
     for label_index in range(len(config.labels)):
         one_row = []
         one_row.append(config.labels[label_index])
-        true_positive = config.metric_dicts[label_index]["TP"]
+        true_positive = one_layer_metrics[label_index]["TP"]
 
-        false_positive = config.metric_dicts[label_index]["FP"]
-        false_negative = config.metric_dicts[label_index]["FN"]
+        false_positive = one_layer_metrics[label_index]["FP"]
+        false_negative = one_layer_metrics[label_index]["FN"]
 
         all_tp += true_positive
         all_fp += false_positive
@@ -56,34 +56,34 @@ def get_metrics(config: Config) -> pd.DataFrame:
     return pd.DataFrame(data_frame_data, columns=columns_name, index=None)
 
 
-def evaluate(config: Config, predict_candidates: list, gt_entities: list):
+def evaluate_layer_by_layer(config: Config, predict_candidates: list, gt_entities: list):
     """
 
     :param config: Config file, used metric_dicts
-    :param predict_candidates: list of tuples, which format (start_index, end_index, label)
+    :param predict_candidates: list of list of tuples, which format (start_index, end_index, label)
     :param gt_entities: list of tuples, which format (start_index, end_index, label)
     :return:
     """
-    gt_hit_list = [False] * len(gt_entities)
 
-    for pred_entity in predict_candidates:
-        pred_entity_label = pred_entity[2]
-        if pred_entity in gt_entities:
-            if gt_hit_list[gt_entities.index(pred_entity)] is False:
-                config.metric_dicts[pred_entity_label]["TP"] += 1
-                gt_hit_list[gt_entities.index(pred_entity)] = True
-        else:
-            config.metric_dicts[pred_entity_label]["FP"] += 1
+    for nested_layer_index, one_layer_predict_candidates in enumerate(predict_candidates):
+        gt_hit_list = [False] * len(gt_entities[nested_layer_index])
+        for pred_entity in one_layer_predict_candidates:
+            pred_entity_label = pred_entity[2]
+            if pred_entity in gt_entities[nested_layer_index]:
+                if gt_hit_list[gt_entities[nested_layer_index].index(pred_entity)] is False:
+                    config.metric_dicts[nested_layer_index][pred_entity_label]["TP"] += 1
+                    gt_hit_list[gt_entities[nested_layer_index].index(pred_entity)] = True
+            else:
+                config.metric_dicts[nested_layer_index][pred_entity_label]["FP"] += 1
 
-    for gt_entity_index in range(len(gt_entities)):
-        gt_entity_label = gt_entities[gt_entity_index][2]
-        if gt_hit_list[gt_entity_index] is False:  # not hit yet
-            config.metric_dicts[gt_entity_label]["FN"] += 1
+        for gt_entity_index in range(len(gt_entities[nested_layer_index])):
+            gt_entity_label = gt_entities[nested_layer_index][gt_entity_index][2]
+            if gt_hit_list[gt_entity_index] is False:  # not hit yet
+                config.metric_dicts[nested_layer_index][gt_entity_label]["FN"] += 1
     return
 
 
-def process_one_nested_level_predict_result(config: Config, predict_bio_label_index: list,
-                                            predict_candidates: list) -> (list, bool):
+def process_one_nested_level_predict_result_layer_by_layer(config: Config, predict_bio_label_index: list) -> list:
     """
 
     :param config: Config file, pass to find_entities function
@@ -94,17 +94,15 @@ def process_one_nested_level_predict_result(config: Config, predict_bio_label_in
     """
     # first process the predict labels:
     # predict_label_index = list((predict_bio_label_index - 1) / 2)  # notice that the label is the gt label.
-    added_flag = False
     # for entity in find_entities(config, predict_bio_label_index):
+    entities = []
     for entity in find_entities_relax(config, predict_bio_label_index):
-        if entity not in predict_candidates:
-            predict_candidates.append(entity)
-            added_flag = True
+        entities.append(entity)
 
-    return predict_candidates, added_flag
+    return entities
 
 
-def _test_one_sentence(config: Config, model: AttentionNestedNERModel, word_ids: list) -> list:  # todo
+def _test_one_sentence_layer_by_layer(config: Config, model: AttentionNestedNERModel, word_ids: list) -> list:  # todo
     """
 
     :param config: Config file, pass to process_one_nested_level_predict_result function.
@@ -112,7 +110,6 @@ def _test_one_sentence(config: Config, model: AttentionNestedNERModel, word_ids:
     :param word_ids: word_id for one sequence.
     :return: predict_candidates: predict entities in this sequence.
     """
-    predict_candidates = []
 
     if config.cuda:
         one_seq_word_ids = Variable(t.Tensor([word_ids]).cuda().long())
@@ -126,18 +123,19 @@ def _test_one_sentence(config: Config, model: AttentionNestedNERModel, word_ids:
     #                                                        len(config.bio_labels))
     # predict_result = predict_result.squeeze(2)  # remove batch num = 1
     # predict_result = predict_result.cpu().data.numpy()
+    layers_results = []
     for nested_level in range(config.max_nested_level):
         predict_bio_label_index = predict_result[nested_level]
         # todo rectify.
         # predict_bio_label_index = rectify_bio_labels(predict_bio_label_index)
         # predict_bio_label_index = t.argmax(predict_result, dim=1).cpu().data.numpy()
-        output_level(config.result_file, nested_level, config.bio_labels, predict_bio_label_index, "pre")
+        # output_level(config.result_file, nested_level, config.bio_labels, predict_bio_label_index, "pre")
 
-        predict_candidates, added_flag = process_one_nested_level_predict_result(config,
-                                                                                 list(predict_bio_label_index),
-                                                                                 predict_candidates)
+        one_layer_result = process_one_nested_level_predict_result_layer_by_layer(config,
+                                                                                  list(predict_bio_label_index))
+        layers_results.append(one_layer_result)
 
-    return predict_candidates
+    return layers_results
 
 
 def _test(config: Config, model: AttentionNestedNERModel):
@@ -148,28 +146,35 @@ def _test(config: Config, model: AttentionNestedNERModel):
     :return:
     """
     # initialize the confusion matrix.
-    config.metric_dicts = [{"TP": 0, "FP": 0, "FN": 0} for i in range(len(config.labels))]
+    metric_dicts = []
+    one_metric_dicts = [{"TP": 0, "FP": 0, "FN": 0} for i in range(len(config.labels))]
+
+    for i in range(config.max_nested_level):
+        metric_dicts.append(deepcopy(one_metric_dicts))
+    config.metric_dicts = metric_dicts
     # start test.
-    config.result_file = open(config.output_path, "w")
+    # config.result_file = open(config.output_path, "w")
     for test_index in range(len(config.test_data)):
-        output_sent(config.result_file, config.test_str[test_index])
+        # output_sent(config.result_file, config.test_str[test_index])
         word_ids = config.test_data[test_index]
         gt_labels = config.test_label[test_index]
-        gt_entities = []
-        for nested_level_index in range(len(gt_labels)):  # all nested levels.
-            # for nested_level_index in range(config.max_nested_level):  # todo attention this gt label!
-            output_level(config.result_file, nested_level_index, config.bio_labels, gt_labels[nested_level_index], "gt")
+        gt_entities = [[] for i in range(config.max_nested_level)]
 
-            gt_entities, added_flag = process_one_nested_level_predict_result(config, gt_labels[nested_level_index],
-                                                                              gt_entities)
-            if added_flag is False:
-                break
-        predict_candidates = _test_one_sentence(config, model, word_ids)
-        evaluate(config, predict_candidates, gt_entities)
-        output_summary(config.result_file, config.test_str[test_index], config.labels, predict_candidates, gt_entities)
+        for nested_level_index in range(len(gt_labels)):  # all nested levels.
+
+            one_layer_entity = process_one_nested_level_predict_result_layer_by_layer(config, gt_labels[
+                nested_level_index])
+            gt_entities[nested_level_index].extend(one_layer_entity)
+
+        predict_candidates = _test_one_sentence_layer_by_layer(config, model, word_ids)
+        evaluate_layer_by_layer(config, predict_candidates, gt_entities)
+        # output_summary(config.result_file, config.test_str[test_index], config.labels, predict_candidates, gt_entities)
     # print result
-    print(get_metrics(config))
-    config.result_file.close()
+    for i in range(config.max_nested_level):
+        print("Layer: ", i + 1)
+        print(get_metrics_one_layer(config, config.metric_dicts[i]))
+
+    # config.result_file.close()
     return
 
 

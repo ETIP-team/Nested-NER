@@ -95,6 +95,7 @@ def start_training(config: Config, model: AttentionNestedNERModel):
 
 def main():
     config = Config()
+    config.list_all_member()
     word_dict = geniaDataset()
     model = AttentionNestedNERModel(config, word_dict).cuda() if config.cuda else AttentionNestedNERModel(config,
                                                                                                           word_dict)

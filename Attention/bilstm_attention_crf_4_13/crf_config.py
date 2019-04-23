@@ -5,13 +5,15 @@
 # On 2019-04-03
 
 import os
+import time
 import torch as t
 
 
 class Config:
     def __init__(self):
+
         # global config
-        self.cuda = True  # False
+        self.cuda = False  # False
         self.WORD_VEC_MODEL_PATH = "../model/word_vector_model/wikipedia-pubmed-and-PMC-w2v.bin"  # ACE05
         # self.WORD_VEC_MODEL_PATH = "./model/word_vector_model/bio_nlp_vec.tar/bio_nlp_vec/PubMed-shuffle-win-2.bin"
         self.START_TAG = "<START>"
@@ -31,7 +33,7 @@ class Config:
         self.learning_rate = 3e-4
         self.l2_penalty = 1e-4
 
-        self.dataset_type = "ACE05_Lu"
+        self.dataset_type = "ACE05_Lu"  # "ACE05_Lu"  # "ACE05"  # "ACE04"  #
         self.labels = ['FAC', 'GPE', 'LOC', 'ORG', 'PER', 'VEH', 'WEA']
         self.bio_labels = ["O"]
         for one_label in self.labels:
@@ -64,6 +66,12 @@ class Config:
         self.metric_dicts = None
 
         self.output_path = "../result/result.data"
+
+    def list_all_member(self):
+        print(time.asctime(time.localtime(time.time())))
+        for name, value in vars(self).items():
+            if value is not None:
+                print('%s=%s' % (name, value))
 
     def model_save_path(self, epoch, create_flag=True):
         final_model_path = "../model/" + self.dataset_type + "/"
@@ -100,13 +108,28 @@ class Config:
         return
 
     def get_train_path(self):
-        return "../data/dataset_layer/ACE/layer_train.data"
+        if self.dataset_type == "ACE2004":
+            return "../data/dataset_layer/ACE2004/layer_train.data"
+        elif self.dataset_type == "ACE05":
+            return "../data/big_first/layer_train.data"
+        elif self.dataset_type == "ACE05_lu":
+            return "../data/dataset_layer/ACE/layer_train.data"
 
     def get_dev_path(self):
-        return "../data/dataset_layer/ACE/layer_dev.data"
+        if self.dataset_type == "ACE2004":
+            return "../data/dataset_layer/ACE2004/layer_dev.data"
+        elif self.dataset_type == "ACE05":
+            return "../data/big_first/layer_dev.data"
+        elif self.dataset_type == "ACE05_lu":
+            return "../data/dataset_layer/ACE/layer_dev.data"
 
     def get_test_path(self):
-        return "../data/dataset_layer/ACE/layer_test.data"
+        if self.dataset_type == "ACE2004":
+            return "../data/dataset_layer/ACE2004/layer_test.data"
+        elif self.dataset_type == "ACE05":
+            return "../data/big_first/layer_test.data"
+        elif self.dataset_type == "ACE05_lu":
+            return "../data/dataset_layer/ACE/layer_test.data"
 
 
 if __name__ == '__main__':
