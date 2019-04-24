@@ -70,6 +70,8 @@ def data_prepare(config: Config, path: str, word_dict: geniaDataset) -> (list, l
 
         data.append(word_ids)
         data_str.append(words)
+        if len(one_seq_labels) == 0:  # empty!
+            one_seq_labels.append(empty_label)  # just one layer.
         labels.append(one_seq_labels)
 
     return data, data_str, labels

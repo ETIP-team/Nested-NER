@@ -199,6 +199,6 @@ class w2VModel:
 
         self.w2vmodel = gensim.models.KeyedVectors.load_word2vec_format(path, binary=binary_wv_model, limit=10)
         print("Limited WV")
-
-        self.w2vmodel = gensim.models.KeyedVectors.load_word2vec_format(path, binary=binary_wv_model)
-        print("Full WV")
+        #
+        # self.w2vmodel = gensim.models.KeyedVectors.load_word2vec_format(path, binary=binary_wv_model)
+        # print("Full WV")
