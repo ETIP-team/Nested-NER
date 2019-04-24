@@ -78,6 +78,7 @@ class Config:
 
     def model_save_path(self, epoch, create_flag=True):
         final_model_path = "../model/" + self.dataset_type + "/"
+        final_model_path += "connect_"
         final_model_path += "crf_bi_" if self.encode_bi_flag else ""
         final_model_path += self.attention_method
         final_model_path += "_max_nested_level_" + str(self.max_nested_level)
