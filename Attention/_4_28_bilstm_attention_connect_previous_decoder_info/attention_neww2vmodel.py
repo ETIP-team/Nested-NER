@@ -8,8 +8,10 @@ from _4_28_bilstm_attention_connect_previous_decoder_info.control_config import 
 class geniaDataset:
     def __init__(self):
         self.config = Config()
-
-        self.w2vmodel = w2VModel(self.config.WORD_VEC_MODEL_PATH)
+        if "glove" in self.config.WORD_VEC_MODEL_PATH:
+            self.w2vmodel = w2VModel(self.config.WORD_VEC_MODEL_PATH, False)
+        else:
+            self.w2vmodel = w2VModel(self.config.WORD_VEC_MODEL_PATH)
         self.embDim = 200
         self.aim = 'train'  # train or test.
         # our vocabulary dictionary, dictionary value is 0 means padding idx.
@@ -28,7 +30,6 @@ class geniaDataset:
 
         # [self.testData, self.testLabel] =  self.readFile(testDataPath)
         self.weight = self.getW2V()
-
 
     def __len__(self):
         if self.aim == 'train':
@@ -197,7 +198,6 @@ class geniaDataset:
 class w2VModel:
     def __init__(self, path, binary_wv_model=True):
         print(path)
-
         # self.w2vmodel = gensim.models.KeyedVectors.load_word2vec_format(path, binary=binary_wv_model, limit=10)
         # print("\n\n\n\n\n\n Attention! Limited WV")
         #

@@ -8,6 +8,10 @@
 ### each input: [$h_i$, $c_i$, $previous_s_i$]
 in which $c_i$ need to compute.
 
-### may add attention in previous_s_i  
+### add one hot control flag
 
-, first decoder
+### add Dropout.
+
+###
+
+

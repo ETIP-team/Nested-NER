@@ -9,11 +9,13 @@ from torch.autograd import Variable
 import pandas as pd
 import numpy as np
 
-from _4_28_bilstm_attention_connect_previous_decoder_info.bilstm_attention_control_method_2_3 import AttentionNestedNERModel
+from _4_28_bilstm_attention_connect_previous_decoder_info.bilstm_attention_control_method_2_3 import \
+    AttentionNestedNERModel
 from _4_28_bilstm_attention_connect_previous_decoder_info.control_config import Config
 from _4_28_bilstm_attention_connect_previous_decoder_info.attention_neww2vmodel import geniaDataset
 
-from _4_28_bilstm_attention_connect_previous_decoder_info.utils import data_prepare, output_summary, output_sent, output_level
+from _4_28_bilstm_attention_connect_previous_decoder_info.utils import data_prepare, output_summary, output_sent, \
+    output_level
 from _4_28_bilstm_attention_connect_previous_decoder_info.utils import find_entities, find_entities_relax
 
 
@@ -183,7 +185,7 @@ def main():
     word_dict = geniaDataset()
     model = AttentionNestedNERModel(config, word_dict).cuda() if config.cuda else AttentionNestedNERModel(config,
                                                                                                           word_dict)
-
+    model.eval()
     config.test_data, config.test_str, config.test_label = data_prepare(config, config.get_test_path(), word_dict)
     del word_dict
     start_test(config, model)

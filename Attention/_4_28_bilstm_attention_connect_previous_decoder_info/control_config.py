@@ -15,6 +15,7 @@ class Config:
         # global config
         self.cuda = True  # False
         self.WORD_VEC_MODEL_PATH = "../model/word_vector_model/wikipedia-pubmed-and-PMC-w2v.bin"  # ACE05
+        # self.WORD_VEC_MODEL_PATH = "../model/word_vector_model/gloved_200d_word2vec.txt"  # GLOVE FOR ACE
         # model config.
 
         self.attention_method = "general"  # "general",  "dot",  "concate", "PLQ", "concate_before_attention"
@@ -31,7 +32,9 @@ class Config:
         self.encode_bi_flag = True
 
         self.learning_rate = 3e-4
+        self.dropout_rate = 0.5  # Dropout!!!
         self.l2_penalty = 1e-4
+
         self.train_empty_entity = False
         self.dataset_type = "ACE05_Lu"  # ACE05_Lu  # ACE05  # ACE2004   # tuning here!
 
@@ -79,6 +82,7 @@ class Config:
         final_model_path = "../model/" + self.dataset_type + "/"
         # final_model_path += "bi_" if self.encode_bi_flag else ""
         # final_model_path += "previous_s_i_"
+        final_model_path += "glove_" if "glove" in self.WORD_VEC_MODEL_PATH else ""
         final_model_path += "pre_s_i_"
         final_model_path += "control" + str(self.add_control_flag)[0]
         final_model_path += self.attention_method
@@ -93,6 +97,7 @@ class Config:
         # final_model_path += "_learning_rate_" + str(self.learning_rate)
         # final_model_path += "_num_batch_" + str(self.num_batch)
         final_model_path += "_l2_" + str(self.l2_penalty)
+        final_model_path += "drop" + str(self.dropout_rate) if self.dropout_rate > 0 else ""
         # final_model_path += "_1_linear"
         # todo add.
 
