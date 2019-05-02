@@ -11,8 +11,8 @@ import torch.nn.functional as F
 
 from torch.autograd import Variable
 
-from _4_16_bilstm_attention_control_method.control_config import Config
-from _4_16_bilstm_attention_control_method.attention_neww2vmodel import geniaDataset
+from _4_30_bilstm_attention_connect_previous_bi_decoder.control_config import Config
+from _4_30_bilstm_attention_connect_previous_bi_decoder.attention_neww2vmodel import geniaDataset
 
 
 class AttentionNestedNERModel(nn.Module):
@@ -36,11 +36,19 @@ class AttentionNestedNERModel(nn.Module):
         self.decode_hidden_units = hidden_units * 2 if encode_bi_flag else hidden_units
         # max nested level one hot!
         # * 3 is VNER.
-        if self.config.attention_method != "PLQ" and self.config.attention_method != "concate_before_attention":
-            self.decode_lstm = nn.LSTM(self.decode_hidden_units * 2 + self.config.max_nested_level, hidden_units * 2,
-                                       decode_num_layers)
+
+        # rectify one: do not use hot one control nested flag anymore.
+        if self.config.add_control_flag:
+            if self.config.attention_method != "PLQ" and self.config.attention_method != "concate_before_attention":
+                self.forward_decode_lstm = nn.LSTM(self.decode_hidden_units * 3 + self.config.max_nested_level,
+                                                   hidden_units * 2, decode_num_layers)
+                if self.config.decode_bi_flag:
+                    self.backward_decode_lstm = nn.LSTM(self.decode_hidden_units * 3 + self.config.max_nested_level,
+                                                        hidden_units * 2, decode_num_layers)
         else:
-            self.decode_lstm = nn.LSTM(self.decode_hidden_units * 2, hidden_units * 2, decode_num_layers)
+            self.forward_decode_lstm = nn.LSTM(self.decode_hidden_units * 3, hidden_units * 2, decode_num_layers)
+            if self.config.decode_bi_flag:
+                self.backward_decode_lstm = nn.LSTM(self.decode_hidden_units * 3, hidden_units * 2, decode_num_layers)
 
         if self.config.attention_method == "concate":
             self.weight_linear = nn.Linear(self.decode_hidden_units + embedding_dim, 1)
@@ -59,12 +67,18 @@ class AttentionNestedNERModel(nn.Module):
         # self.linear1 = nn.Linear(self.decode_hidden_units, self.linear_hidden_units)
         # 4-12 one linear layer.
         # self.linear2 = nn.Linear(self.linear_hidden_units, self.classes_num)
-        self.linear2 = nn.Linear(self.decode_hidden_units, self.classes_num)
+
+        if self.config.decode_bi_flag:
+            self.linear2 = nn.Linear(self.decode_hidden_units * 2, self.classes_num)
+        else:
+            self.linear2 = nn.Linear(self.decode_hidden_units, self.classes_num)
 
         self.optimizer = None
         self.cross_entropy_loss = nn.CrossEntropyLoss()
 
-    def compute_context_input(self, s_i: Variable, h: Variable, time: int, current_nested_level: int) -> Variable:
+    # rectify two:
+    def compute_context_input(self, s_i: Variable, previous_s: Variable, h: Variable, time: int,
+                              current_nested_level: int) -> Variable:
         """
         To compute context input in time t+1 in different compute type.
 
@@ -137,13 +151,15 @@ class AttentionNestedNERModel(nn.Module):
                               norm_weight)  # [num_batch, embedding_dim, seq_len] [num_batch, seq_len, 1] = [num_batch, embedding_dim, 1]
 
         h_i = h[time, :, :].unsqueeze(0).permute(1, 2, 0)  # [num_batch, embedding_dim, 1]
-
-        context_input = t.cat([context_input, h_i], 1)  # [num_batch, embedding_dim * 2, seq_len = 1]
+        # rectify four
+        previous_s_i = previous_s[time, :, :].unsqueeze(0).permute(1, 2, 0)  # [num_batch, embedding_dim, 1]
+        context_input = t.cat([context_input, h_i, previous_s_i], 1)  # [num_batch, embedding_dim * 2, seq_len = 1]
 
         context_input = context_input.permute(2, 0, 1)  # [seq_len = 1, num_batch, embedding * 2]
 
-        if self.config.attention_method != "PLQ" and self.config.attention_method != "concate_before_attention":
-            context_input = t.cat([context_input, control_nested_tensor], 2)  # add in third dim.
+        if self.config.add_control_flag:
+            if self.config.attention_method != "PLQ" and self.config.attention_method != "concate_before_attention":
+                context_input = t.cat([context_input, control_nested_tensor], 2)  # add in third dim.
 
         return context_input
 
@@ -156,70 +172,96 @@ class AttentionNestedNERModel(nn.Module):
             cell_state_i = np.zeros((decode_num_layers, num_batch, decode_hidden_size))
             s_i = Variable(t.Tensor(s_i))
             cell_state_i = Variable(t.Tensor(cell_state_i))
-            if self.config.cuda:
-                s_i = s_i.cuda()
-                cell_state_i = cell_state_i.cuda()
+        if self.config.cuda:
+            s_i = s_i.cuda()
+            cell_state_i = cell_state_i.cuda()
         return s_i, cell_state_i
+
+    def one_decoder_forward(self, seq_max_nested_level: int, h: Variable, h_t: Variable, s_t: Variable, num_batch: int,
+                            decode_num_layers: int, decode_hidden_size: int, seq_len: int,
+                            forward_flag: bool) -> Variable:
+        s_i, cell_state_i = self.compute_decoder_init_state(h_t, s_t, num_batch, decode_num_layers, decode_hidden_size)
+        output_list = []
+        previous_s_list = []
+
+        for control_nested_level in range(seq_max_nested_level):
+            if control_nested_level == 0:  # fisrt layer:
+                previous_s = h
+            else:
+                wait = True
+
+            if not self.config.level_connection:
+                s_i, cell_state_i = self.compute_decoder_init_state(h_t, s_t, num_batch, decode_num_layers,
+                                                                    decode_hidden_size)
+            one_nested_level_output_list = []
+            if forward_flag:
+                for context_index in range(seq_len):
+                    s_compute = s_i  # get last layer [1, num_batch, hidden_size]
+
+                    context_input = self.compute_context_input(s_compute, previous_s, h,
+                                                               context_index,
+                                                               control_nested_level)  # [seq_len = 1, num_batch, embedding * 3]
+                    # save one time output and update the cell state.
+
+                    one_time_output, (s_i, cell_state_i) = self.forward_decode_lstm.forward(context_input,
+                                                                                            (s_i, cell_state_i))
+                    one_nested_level_output_list.append(one_time_output)
+                    previous_s_list.append(s_i)  # rectify three   # only one time step. s_i === one_time_output
+                output_list.append(
+                    t.cat(one_nested_level_output_list).unsqueeze(0))  # seq_len, batch_num, decode_hidden_size
+            else:
+                for context_index in range(seq_len - 1, -1, -1):
+                    s_compute = s_i  # get last layer [1, num_batch, hidden_size]
+
+                    context_input = self.compute_context_input(s_compute, previous_s, h,
+                                                               context_index,
+                                                               control_nested_level)  # [seq_len = 1, num_batch, embedding * 3]
+                    # save one time output and update the cell state.
+
+                    one_time_output, (s_i, cell_state_i) = self.backward_decode_lstm.forward(context_input,
+                                                                                             (s_i, cell_state_i))
+                    one_nested_level_output_list.append(one_time_output)
+                    previous_s_list.append(s_i)  # rectify three   # only one time step. s_i === one_time_output
+                output_list.append(
+                    t.cat(one_nested_level_output_list).unsqueeze(0))  # seq_len, batch_num, decode_hidden_size
+            previous_s = t.cat(previous_s_list, 0)  # [seq_len, num_batch, embedding_dim]
+        return t.cat(output_list, 0)  # [nested_level, seq_len, batch_num, decode_hidden_size]
 
     def forward(self, seqs, seq_max_nested_level):  # todo modify this forward to
         """seqs: Tensor for word idx."""
 
         seqs = self.embedding(seqs).permute(1, 0, 2)  # [seq_len, num_batch, embedding_dim]
         seq_len = seqs.shape[0]
+        if seq_len > 2:
+            wait = True
+
         num_batch = seqs.shape[1]
-        decode_num_layers = self.decode_lstm.num_layers
-        decode_hidden_size = self.decode_lstm.hidden_size
+        decode_num_layers = self.forward_decode_lstm.num_layers
+        decode_hidden_size = self.forward_decode_lstm.hidden_size
 
         h, (h_t, s_t) = self.encode_lstm.forward(seqs)  # [seq_len, num_batch, embedding_dim]
         # h = h.permute(1, 0, 2)  # [num_batch, seq_len, embedding_dim]
         # seqs be one cause decode input only one
         # initial i = 0.
 
-        # if self.config.encoder_decoder_connection:  # todo test.
-        #     s_i = h_t.view(1, num_batch, -1).expand(decode_num_layers, num_batch, -1)
-        #     cell_state_i = s_t.view(1, num_batch, -1).expand(decode_num_layers, num_batch, -1)
-        # else:
-        #     s_i = np.zeros((decode_num_layers, num_batch, decode_hidden_size))
-        #     cell_state_i = np.zeros((decode_num_layers, num_batch, decode_hidden_size))
-        #     s_i = Variable(t.Tensor(s_i))
-        #     cell_state_i = Variable(t.Tensor(cell_state_i))
-        #     if self.config.cuda:
-        #         s_i = s_i.cuda()
-        #         cell_state_i = cell_state_i.cuda()
-        s_i, cell_state_i = self.compute_decoder_init_state(h_t, s_t, num_batch, decode_num_layers, decode_hidden_size)
+        forward_output = self.one_decoder_forward(seq_max_nested_level, h, h_t, s_t, num_batch, decode_num_layers,
+                                                  decode_hidden_size, seq_len,
+                                                  True)  # [nested_level, seq_len, batch_num, decode_hidden_size]
+        if self.config.decode_bi_flag:
+            backward_output = self.one_decoder_forward(seq_max_nested_level, h, h_t, s_t, num_batch, decode_num_layers,
+                                                       decode_hidden_size, seq_len,
+                                                       False)  # [nested_level, seq_len, batch_num, decode_hidden_size]
+            output = t.cat([forward_output, backward_output],
+                           3)  # [nested_level, seq_len, batch_num, decode_hidden_size*2]
+        else:
+            output = forward_output
 
-        output_list = []
         # decode input seq_len must 1
-        for control_nested_level in range(seq_max_nested_level):
-            if not self.config.level_connection:
-                s_i, cell_state_i = self.compute_decoder_init_state(h_t, s_t, num_batch, decode_num_layers,
-                                                                    decode_hidden_size)
-            one_nested_level_output_list = []
-            if control_nested_level == 1:
-                wait = True
-            for context_index in range(seq_len):
-                s_compute = s_i[-1].unsqueeze(0)  # get last layer [1, num_batch, hidden_size]
-
-                # todo context_input add control info.
-
-                context_input = self.compute_context_input(s_compute, h,
-                                                           context_index,
-                                                           control_nested_level)  # [seq_len = 1, num_batch, embedding * 2]
-
-                # include h_decode_s_previous.
-                # context_input = t.cat([context_input, s_compute, control_nested_tensor],
-                #                       2)  # add in third dim. 4-9 VNER
-
-                # save one time output and update the cell state.
-
-                one_time_output, (s_i, cell_state_i) = self.decode_lstm.forward(context_input, (s_i, cell_state_i))
-                one_nested_level_output_list.append(one_time_output)
-            output_list.append(
-                t.cat(one_nested_level_output_list).unsqueeze(0))  # seq_len, batch_num, decode_hidden_size
-
-        output = t.cat(output_list, 0)  # [nested_level, seq_len, batch_num, decode_hidden_size]
 
         # output = F.relu(self.linear1(output))  # forward 4-12 one linear.
+
+        F.dropout(output, self.config.dropout_rate, training=self.training)
+
         output = self.linear2(output)  # [seq_len, batch_num, bio_classes_num]
         return output.reshape(-1, self.classes_num)
 

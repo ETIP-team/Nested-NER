@@ -2,14 +2,16 @@ import gensim
 import re
 # from torch.utils.data import DataLoader
 import torch
-from _4_16_bilstm_attention_control_method.control_config import Config
+from _4_30_bilstm_attention_connect_previous_bi_decoder.control_config import Config
 
 
 class geniaDataset:
     def __init__(self):
         self.config = Config()
-
-        self.w2vmodel = w2VModel(self.config.WORD_VEC_MODEL_PATH)
+        if "glove" in self.config.WORD_VEC_MODEL_PATH:
+            self.w2vmodel = w2VModel(self.config.WORD_VEC_MODEL_PATH, False)
+        else:
+            self.w2vmodel = w2VModel(self.config.WORD_VEC_MODEL_PATH)
         self.embDim = 200
         self.aim = 'train'  # train or test.
         # our vocabulary dictionary, dictionary value is 0 means padding idx.
@@ -196,9 +198,8 @@ class geniaDataset:
 class w2VModel:
     def __init__(self, path, binary_wv_model=True):
         print(path)
-
         # self.w2vmodel = gensim.models.KeyedVectors.load_word2vec_format(path, binary=binary_wv_model, limit=10)
-        # print("\n\n\n\n\n Attention!   Limited WV")
-
+        # print("\n\n\n\n\n\n Attention! Limited WV")
+        #
         self.w2vmodel = gensim.models.KeyedVectors.load_word2vec_format(path, binary=binary_wv_model)
         print("Full WV")

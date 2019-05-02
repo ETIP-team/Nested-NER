@@ -14,15 +14,15 @@ class Config:
     def __init__(self):
         # global config
         self.cuda = True  # False
-        self.WORD_VEC_MODEL_PATH = "../model/word_vector_model/wikipedia-pubmed-and-PMC-w2v.bin"  # ACE05
-        # self.WORD_VEC_MODEL_PATH = "../model/word_vector_model/gloved_200d_word2vec.txt"  # GLOVE FOR ACE
+        # self.WORD_VEC_MODEL_PATH = "../model/word_vector_model/wikipedia-pubmed-and-PMC-w2v.bin"  # ACE05
+        self.WORD_VEC_MODEL_PATH = "../model/word_vector_model/gloved_200d_word2vec.txt"  # GLOVE FOR ACE
         # model config.
 
         self.attention_method = "general"  # "general",  "dot",  "concate", "PLQ", "concate_before_attention"
         self.encoder_decoder_connection = True
         self.level_connection = True
         self.fill_label_max = True
-        self.add_control_flag = False
+        self.add_control_flag = True
         self.embedding_dim = 200
         # self.num_embeddings = 5
         self.hidden_units = 100  # embedding size must equals hidden_units * 2
@@ -32,7 +32,7 @@ class Config:
         self.encode_bi_flag = True
 
         self.learning_rate = 3e-4
-        self.dropout_rate = 0.5  # Dropout!!!
+        self.dropout_rate = 0.5  # 0.5  # Dropout!!!
         self.l2_penalty = 1e-4
 
         self.train_empty_entity = False
@@ -57,7 +57,7 @@ class Config:
         self.max_epoch = 40
         self.start_save_epoch = 1
 
-        self.start_test_epoch = 30
+        self.start_test_epoch = 5
 
         self.train_data = None
         self.train_label = None

@@ -163,9 +163,9 @@ class AttentionNestedNERModel(nn.Module):
             cell_state_i = np.zeros((decode_num_layers, num_batch, decode_hidden_size))
             s_i = Variable(t.Tensor(s_i))
             cell_state_i = Variable(t.Tensor(cell_state_i))
-            if self.config.cuda:
-                s_i = s_i.cuda()
-                cell_state_i = cell_state_i.cuda()
+        if self.config.cuda:
+            s_i = s_i.cuda()
+            cell_state_i = cell_state_i.cuda()
         return s_i, cell_state_i
 
     def forward(self, seqs, seq_max_nested_level):  # todo modify this forward to
@@ -173,6 +173,9 @@ class AttentionNestedNERModel(nn.Module):
 
         seqs = self.embedding(seqs).permute(1, 0, 2)  # [seq_len, num_batch, embedding_dim]
         seq_len = seqs.shape[0]
+        if seq_len > 2:
+            wait = True
+
         num_batch = seqs.shape[1]
         decode_num_layers = self.decode_lstm.num_layers
         decode_hidden_size = self.decode_lstm.hidden_size
@@ -209,9 +212,7 @@ class AttentionNestedNERModel(nn.Module):
                                                                     decode_hidden_size)
             one_nested_level_output_list = []
             for context_index in range(seq_len):
-                s_compute = s_i[-1].unsqueeze(0)  # get last layer [1, num_batch, hidden_size]
-
-                # todo context_input add control info.
+                s_compute = s_i  # get last layer [1, num_batch, hidden_size]
 
                 context_input = self.compute_context_input(s_compute, previous_s, h,
                                                            context_index,
@@ -225,7 +226,7 @@ class AttentionNestedNERModel(nn.Module):
 
                 one_time_output, (s_i, cell_state_i) = self.decode_lstm.forward(context_input, (s_i, cell_state_i))
                 one_nested_level_output_list.append(one_time_output)
-                previous_s_list.append(s_i)  # rectify three
+                previous_s_list.append(s_i)  # rectify three   # only one time step. s_i === one_time_output
             output_list.append(
                 t.cat(one_nested_level_output_list).unsqueeze(0))  # seq_len, batch_num, decode_hidden_size
 
