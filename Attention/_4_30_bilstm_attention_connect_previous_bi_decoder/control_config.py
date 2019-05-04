@@ -13,6 +13,7 @@ import torch as t
 class Config:
     def __init__(self):
         # global config
+        self.running_mode = None
         self.cuda = True  # False
         # self.WORD_VEC_MODEL_PATH = "../model/word_vector_model/wikipedia-pubmed-and-PMC-w2v.bin"  # ACE05
         self.WORD_VEC_MODEL_PATH = "../model/word_vector_model/gloved_200d_word2vec.txt"  # GLOVE FOR ACE
@@ -38,7 +39,7 @@ class Config:
         self.dropout_rate = 0.5  # 0.5  # Dropout!!!
         self.l2_penalty = 1e-4
 
-        self.dataset_type = "ACE05_Lu"  # ACE05_Lu  # ACE05  # ACE2004   # tuning here!
+        self.dataset_type = "ACE04+05"  # ACE05_Lu  # ACE05  # ACE2004   # ACE04+05
 
         if self.dataset_type.startswith("ACE"):
             self.labels = ['FAC', 'GPE', 'LOC', 'ORG', 'PER', 'VEH', 'WEA']
@@ -136,6 +137,8 @@ class Config:
             return "../data/dataset_layer/ACE/layer_train.data"
         elif self.dataset_type == "GENIA":
             return "../data/dataset_layer/GENIA/layer_train.data"
+        elif self.dataset_type == "ACE04+05":
+            return "../data/dataset_layer/ACE04+05/layer_train.data"
 
     def get_dev_path(self):
         if self.dataset_type == "ACE2004":
@@ -147,6 +150,8 @@ class Config:
             return "../data/dataset_layer/ACE/layer_dev.data"
         elif self.dataset_type == "GENIA":
             return "../data/dataset_layer/GENIA/layer_dev.data"
+        elif self.dataset_type == "ACE04+05":
+            return "../data/dataset_layer/ACE04+05/layer_dev.data"
 
     def get_test_path(self):
         if self.dataset_type == "ACE2004":
@@ -158,6 +163,8 @@ class Config:
             return "../data/dataset_layer/ACE/layer_test.data"
         elif self.dataset_type == "GENIA":
             return "../data/dataset_layer/GENIA/layer_test.data"
+        elif self.dataset_type == "ACE04+05":
+            return "../data/dataset_layer/ACE04+05/layer_test.data"
 
 
 if __name__ == '__main__':

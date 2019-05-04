@@ -3,6 +3,7 @@
 # Created by Drogo Zhang
 #
 # On 2019-04-13
+import sys
 
 import torch as t
 import torch.nn as nn
@@ -17,6 +18,8 @@ from _5_1_bilstm_attention_bi_decoder_crf.attention_neww2vmodel import geniaData
 from _5_1_bilstm_attention_bi_decoder_crf.utils import data_prepare
 
 t.manual_seed(42)
+sys.setrecursionlimit(10000)
+
 
 def train_one_batch(config: Config, model: AttentionNestedNERModel, one_batch_data: list, one_batch_label: list):
     # consider carefully to split for batch
@@ -57,7 +60,7 @@ def train_one_epoch(config: Config,
     train_nested_level_list = sorted(list(set(data_nested_level)))
 
     for nested_level in train_nested_level_list:
-    # for nested_level in train_nested_level_list[1:]:
+        # for nested_level in train_nested_level_list[1:]:
         sub_data = np.array(config.train_data)[data_nested_level == nested_level]
         sub_label = np.array(config.train_label)[data_nested_level == nested_level]
 
@@ -96,6 +99,7 @@ def start_training(config: Config, model: AttentionNestedNERModel):
 
 def main():
     config = Config()
+    config.running_mode = "train"
     config.list_all_member()
     word_dict = geniaDataset()
     model = AttentionNestedNERModel(config, word_dict).cuda() if config.cuda else AttentionNestedNERModel(config,

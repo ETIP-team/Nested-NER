@@ -188,6 +188,7 @@ def start_test(config: Config, model: AttentionNestedNERModel):
 
 def main():
     config = Config()
+    config.running_mode = "test"
     config.list_all_member()
     word_dict = geniaDataset()
     model = AttentionNestedNERModel(config, word_dict).cuda() if config.cuda else AttentionNestedNERModel(config,

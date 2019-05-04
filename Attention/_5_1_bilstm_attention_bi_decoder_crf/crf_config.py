@@ -11,7 +11,7 @@ import torch as t
 
 class Config:
     def __init__(self):
-
+        config.running_mode = None  # be train or test in different running files.
         # global config
         self.cuda = False  # False
         # self.WORD_VEC_MODEL_PATH = "../model/word_vector_model/wikipedia-pubmed-and-PMC-w2v.bin"  # ACE05
@@ -41,7 +41,7 @@ class Config:
         self.dropout_rate = 0  # 0.5 # Dropout
         self.l2_penalty = 1e-4
 
-        self.dataset_type = "ACE05_Lu"
+        self.dataset_type = "ACE05_Lu"  # ACE2004, ACE05, GENIA, ACE05_Lu, ACE04+05
 
         if self.dataset_type.startswith("ACE"):
             self.labels = ['FAC', 'GPE', 'LOC', 'ORG', 'PER', 'VEH', 'WEA']
@@ -68,7 +68,7 @@ class Config:
         self.max_epoch = 30
         self.start_save_epoch = 1
 
-        self.start_test_epoch = 3
+        self.start_test_epoch = 10
 
         self.train_data = None
         self.train_label = None

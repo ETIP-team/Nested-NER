@@ -68,10 +68,16 @@ def data_prepare(config: Config, path: str, word_dict: geniaDataset) -> (list, l
         if not config.fill_label_max:  # not fill the empty nested label.
             [one_seq_labels.remove(empty_label) for i in range(empty_label_count)]  # remove the empty labels.
 
-        if len(one_seq_labels) == 0:  # empty!
-            one_seq_labels.append(empty_label)  # just one layer.
-            if not config.train_empty_entity:
-                continue
+            if len(one_seq_labels) == 0:  # empty!
+                if not config.train_empty_entity:
+                    continue
+                else:
+                    one_seq_labels.append(empty_label)  # just one layer. must do
+        else:
+            if empty_label_count == max_nested_level:  # empty
+                if not config.train_empty_entity:
+                    continue
+
         labels.append(one_seq_labels)
         data.append(word_ids)
         data_str.append(words)

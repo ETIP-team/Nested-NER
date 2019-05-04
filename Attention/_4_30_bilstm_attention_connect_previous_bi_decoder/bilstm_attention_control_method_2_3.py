@@ -260,7 +260,7 @@ class AttentionNestedNERModel(nn.Module):
 
         # output = F.relu(self.linear1(output))  # forward 4-12 one linear.
 
-        F.dropout(output, self.config.dropout_rate, training=self.training)
+        output = F.dropout(output, self.config.dropout_rate, training=self.training)
 
         output = self.linear2(output)  # [seq_len, batch_num, bio_classes_num]
         return output.reshape(-1, self.classes_num)
