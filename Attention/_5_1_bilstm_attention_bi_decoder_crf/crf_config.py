@@ -11,7 +11,7 @@ import torch as t
 
 class Config:
     def __init__(self):
-        config.running_mode = None  # be train or test in different running files.
+        self.running_mode = None  # be train or test in different running files.
         # global config
         self.cuda = False  # False
         # self.WORD_VEC_MODEL_PATH = "../model/word_vector_model/wikipedia-pubmed-and-PMC-w2v.bin"  # ACE05
@@ -68,7 +68,7 @@ class Config:
         self.max_epoch = 30
         self.start_save_epoch = 1
 
-        self.start_test_epoch = 10
+        self.start_test_epoch = 2
 
         self.train_data = None
         self.train_label = None

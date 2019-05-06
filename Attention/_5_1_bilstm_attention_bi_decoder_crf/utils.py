@@ -162,23 +162,19 @@ def find_entities_relax(config: Config, predict_bio_label_index: list) -> list:
             labels.append("O")
 
     start_index = -1
-    current_label = "O"
-
+    
     for label_index in range(len(labels)):
         if labels[label_index] == "O":
             if start_index > -1:
                 predict_entities.append((start_index, label_index, config.labels.index(labels[start_index])))
                 start_index = -1
-                current_label = "O"
         else:
-            if current_label == "O":  # previous is bg.
+            if labels[label_index - 1] == "O":  # previous is bg.
                 start_index = label_index
             else:  # previous is gt
-                if current_label != labels[label_index]:
+                if labels[label_index - 1] != labels[label_index]:
                     predict_entities.append((start_index, label_index, config.labels.index(labels[start_index])))
                     start_index = label_index
-                    current_label = labels[label_index]
-
         if label_index == len(labels) - 1:  # if the final, end started entity.
             if start_index > -1:
                 predict_entities.append((start_index, len(labels), config.labels.index(labels[start_index])))

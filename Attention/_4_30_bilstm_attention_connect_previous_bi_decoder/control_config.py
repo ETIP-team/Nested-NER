@@ -14,18 +14,19 @@ class Config:
     def __init__(self):
         # global config
         self.running_mode = None
+
         self.cuda = True  # False
-        # self.WORD_VEC_MODEL_PATH = "../model/word_vector_model/wikipedia-pubmed-and-PMC-w2v.bin"  # ACE05
-        self.WORD_VEC_MODEL_PATH = "../model/word_vector_model/gloved_200d_word2vec.txt"  # GLOVE FOR ACE
+        self.WORD_VEC_MODEL_PATH = "../model/word_vector_model/wikipedia-pubmed-and-PMC-w2v.bin"  # ACE05
+        # self.WORD_VEC_MODEL_PATH = "../model/word_vector_model/gloved_200d_word2vec.txt"  # GLOVE FOR ACE
         # model config.
 
         self.attention_method = "general"  # "general",  "dot",  "concate", "PLQ", "concate_before_attention"
         self.encoder_decoder_connection = True
         self.level_connection = True
-        self.fill_label_max = True
-        self.add_control_flag = True
+        self.fill_label_max = False  # on training
+        self.add_control_flag = False
         self.encode_bi_flag = True
-        self.decode_bi_flag = True
+        self.decode_bi_flag = False
         self.train_empty_entity = False
 
         self.embedding_dim = 200
@@ -39,7 +40,7 @@ class Config:
         self.dropout_rate = 0.5  # 0.5  # Dropout!!!
         self.l2_penalty = 1e-4
 
-        self.dataset_type = "ACE04+05"  # ACE05_Lu  # ACE05  # ACE2004   # ACE04+05
+        self.dataset_type = "ACE05_Lu"  # ACE05_Lu  # ACE05  # ACE2004   # ACE04+05
 
         if self.dataset_type.startswith("ACE"):
             self.labels = ['FAC', 'GPE', 'LOC', 'ORG', 'PER', 'VEH', 'WEA']
@@ -52,15 +53,15 @@ class Config:
             self.bio_labels.extend(["B-" + one_label, "I-" + one_label])
 
         self.classes_num = len(self.bio_labels)  # Begin, Inside, Out of entity
-        self.max_nested_level = 3
+        self.max_nested_level = 1
 
         # train config
-        self.num_batch = 4
+        self.num_batch = 8
 
         self.max_epoch = 40
         self.start_save_epoch = 1
 
-        self.start_test_epoch = 5
+        self.start_test_epoch = 9
 
         self.train_data = None
         self.train_label = None
@@ -87,20 +88,20 @@ class Config:
         # final_model_path += "previous_s_i_"
         final_model_path += "bi_de_" if self.decode_bi_flag else ""
         final_model_path += "glove_" if "glove" in self.WORD_VEC_MODEL_PATH else ""
-        final_model_path += "pre_s_i_"
-        final_model_path += "control" + str(self.add_control_flag)[0]
-        final_model_path += self.attention_method
-        # final_model_path += "_max_nested_level_" + str(self.max_nested_level)
-        final_model_path += "_max_level_" + str(self.max_nested_level)[0]
-        final_model_path += "_en_de" + str(self.encoder_decoder_connection)[0]
-        final_model_path += "_level" + str(self.level_connection)[0]
+        final_model_path += "pre_s_i"
+        final_model_path += "_control" if self.add_control_flag else ""
+        final_model_path += "_" + self.attention_method
+        final_model_path += "_max_level_" + str(self.max_nested_level)[0] if self.max_nested_level else ""
+        final_model_path += "_en_de" + str(self.encoder_decoder_connection)[
+            0] if self.encoder_decoder_connection else ""
+        final_model_path += "_level" if self.level_connection else ""
         # final_model_path += "_train_empty_entity" + str(self.train_empty_entity)
-        final_model_path += "_train_empty" + str(self.train_empty_entity)[0]
-        final_model_path += "_fill_label" + str(self.fill_label_max)[0]
+        final_model_path += "_train_empty" if self.train_empty_entity else ""
+        final_model_path += "_fill_label" if self.fill_label_max else ""
         # final_model_path += "_hidden_units_" + str(self.hidden_units)
         # final_model_path += "_learning_rate_" + str(self.learning_rate)
         # final_model_path += "_num_batch_" + str(self.num_batch)
-        final_model_path += "_l2_" + str(self.l2_penalty)
+        final_model_path += "_l2_" + str(self.l2_penalty) if self.l2_penalty > 0 else ""
         final_model_path += "drop" + str(self.dropout_rate) if self.dropout_rate > 0 else ""
         # final_model_path += "_1_linear"
         # todo add.
